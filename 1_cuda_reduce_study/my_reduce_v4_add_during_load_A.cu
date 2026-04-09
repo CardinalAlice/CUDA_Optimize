@@ -7,8 +7,9 @@
 
 __global__ void reduce(float *d_input, float *d_output) {
     __shared__ float shared[THREAD_PER_BLOCK];
-    float *input_begin = d_input + blockDim.x * blockIdx.x;
-    shared[threadIdx.x] = input_begin[threadIdx.x];
+    // 可以通过设计总的block数和thread数通过网格跨步循环来实现，感觉比这个简单
+    float *input_begin = d_input + blockDim.x * blockIdx.x * 2;
+    shared[threadIdx.x] = input_begin[threadIdx.x] + input_begin[threadIdx.x + blockDim.x];
     __syncthreads();
 
     for (int i = blockDim.x / 2; i > 0; i /= 2) {
@@ -38,11 +39,11 @@ int main() {
     float *d_input;
     cudaMalloc((void **)&d_input, N * sizeof(float));
 
-    int block_num = N / THREAD_PER_BLOCK;
-    float *output = (float *)malloc((N / THREAD_PER_BLOCK) * sizeof(float));
+    int block_num = N / THREAD_PER_BLOCK / 2;
+    float *output = (float *)malloc(block_num * sizeof(float));
     float *d_output;
-    cudaMalloc((void **)&d_output, (N / THREAD_PER_BLOCK) * sizeof(float));
-    float *result = (float *)malloc((N / THREAD_PER_BLOCK) * sizeof(float));
+    cudaMalloc((void **)&d_output, block_num* sizeof(float));
+    float *result = (float *)malloc(block_num * sizeof(float));
     for (int i = 0; i < N; i++) {
         input[i] = 2.0 * (float)drand48() - 1.0;
     }
@@ -50,15 +51,15 @@ int main() {
     // cpu clac
     for (int i = 0; i < block_num; ++i) {
         float cur = 0;
-        for (int j = 0; j < THREAD_PER_BLOCK; j++) {
-            cur += input[i * THREAD_PER_BLOCK + j];
+        for (int j = 0; j < 2 * THREAD_PER_BLOCK; j++) {
+            cur += input[i * 2 * THREAD_PER_BLOCK + j];
         }
         result[i] = cur;
     }
 
     cudaMemcpy(d_input, input, N * sizeof(float), cudaMemcpyHostToDevice);
 
-    dim3 Grid(N / THREAD_PER_BLOCK, 1);
+    dim3 Grid(block_num, 1);
     dim3 Block(THREAD_PER_BLOCK, 1);
 
     reduce<<<Grid, Block>>>(d_input, d_output);

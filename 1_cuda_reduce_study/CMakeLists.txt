@@ -28,3 +28,4 @@ target_link_libraries(my_reduce_v4_add_during_load_A PRIVATE CUDA::cudart ${CUDA
 # if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 #     target_compile_options(my_reduce_v4_add_during_load_A PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-G>)
 # endif()
+
